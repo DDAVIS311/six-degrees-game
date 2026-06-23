@@ -117,7 +117,8 @@ body::before {
 
 /* ── Horizontal scroll ladder ──────────────────────────────────────────────── */
 #ladder {
-  flex: none;
+  flex: 1;
+  min-height: 0;
   width: 100%;
   display: flex;
   flex-direction: row;
@@ -172,7 +173,11 @@ body::before {
   display: flex;
   background: #080604;
   width: 100%;
-  height: clamp(180px, 50vw, 400px);
+  /* flex:1 lets it fill whatever space the ladder gives after perf rows;
+     max-height caps it on desktop; min-height keeps faces visible */
+  flex: 1;
+  min-height: 60px;
+  max-height: 400px;
   overflow: hidden;
 }
 
@@ -548,11 +553,6 @@ body::before {
     width: 14px;
     height: 10px;
     border-radius: 2px;
-  }
-
-  /* Taller window on mobile so faces fill more of the screen */
-  .film-window {
-    height: clamp(160px, 65vw, 400px);
   }
 
   /* Compact logo plate so it doesn't dominate the smaller window */

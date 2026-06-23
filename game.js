@@ -174,6 +174,7 @@ async function initGame() {
     renderLadder();
     showFilmStrip(true);
     wireUniversalInput();
+    pinGuessBarToKeyboard();
 
     // Pre-fetch next co-star for actorB (right end of the chain)
     fetchCoStars(actorB.id, gameState.ladder.map(a => a.id)).catch(() => {});
@@ -198,6 +199,34 @@ function wireUniversalInput() {
     if (e.key === "Enter") doUniversalSubmit();
   });
   btn.addEventListener("click", doUniversalSubmit);
+
+  // iOS Safari: prevent the viewport from scrolling to chase the focused input.
+  // The guess bar is position:fixed so it needs no scroll — just restore position.
+  input.addEventListener("focus", () => {
+    const sy = window.scrollY;
+    requestAnimationFrame(() => window.scrollTo(0, sy));
+  });
+}
+
+// Pin #guess-bar to the visual viewport bottom so it stays above the
+// software keyboard on both iOS (visualViewport scroll) and Android
+// (interactive-widget=resizes-content handles it natively).
+function pinGuessBarToKeyboard() {
+  if (!window.visualViewport) return;
+  const bar = document.getElementById("guess-bar");
+  if (!bar) return;
+
+  function update() {
+    const offset = window.innerHeight
+      - window.visualViewport.offsetTop
+      - window.visualViewport.height;
+    document.documentElement.style.setProperty(
+      "--vvp-offset", Math.max(0, offset) + "px"
+    );
+  }
+
+  window.visualViewport.addEventListener("resize", update);
+  window.visualViewport.addEventListener("scroll", update);
 }
 
 function doUniversalSubmit() {

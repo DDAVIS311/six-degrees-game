@@ -357,7 +357,7 @@ body::before {
 /* ── Universal guess bar (fixed, dark, sits below the orange strip) ────────── */
 #guess-bar {
   position: fixed;
-  bottom: 0;
+  bottom: var(--vvp-offset, 0px);
   left: 50%;
   transform: translateX(-50%);
   width: 100%;

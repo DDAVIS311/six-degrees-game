@@ -200,33 +200,22 @@ function wireUniversalInput() {
   });
   btn.addEventListener("click", doUniversalSubmit);
 
-  // iOS Safari: prevent the viewport from scrolling to chase the focused input.
-  // The guess bar is position:fixed so it needs no scroll — just restore position.
-  input.addEventListener("focus", () => {
-    const sy = window.scrollY;
-    requestAnimationFrame(() => window.scrollTo(0, sy));
-  });
 }
 
-// Pin #guess-bar to the visual viewport bottom so it stays above the
-// software keyboard on both iOS (visualViewport scroll) and Android
-// (interactive-widget=resizes-content handles it natively).
+// Resize body to the visual viewport height so the flex layout (header +
+// film strip + guess bar) all shrink to fit the space above the keyboard.
+// CSS viewport units (svh/dvh) do not respond to the software keyboard on
+// iOS Safari — only the visualViewport API does.
 function pinGuessBarToKeyboard() {
   if (!window.visualViewport) return;
-  const bar = document.getElementById("guess-bar");
-  if (!bar) return;
 
   function update() {
-    const offset = window.innerHeight
-      - window.visualViewport.offsetTop
-      - window.visualViewport.height;
-    document.documentElement.style.setProperty(
-      "--vvp-offset", Math.max(0, offset) + "px"
-    );
+    document.body.style.height = window.visualViewport.height + "px";
   }
 
   window.visualViewport.addEventListener("resize", update);
   window.visualViewport.addEventListener("scroll", update);
+  update();
 }
 
 function doUniversalSubmit() {

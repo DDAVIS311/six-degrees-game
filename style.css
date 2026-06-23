@@ -35,7 +35,12 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  height: 100svh;
+  /* position:fixed + inset:0 prevents any document scroll on iOS,
+     which stops Safari from panning the viewport when an input is focused.
+     JS overrides the height to match visualViewport.height when keyboard opens. */
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: 100vh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -107,7 +112,6 @@ body::before {
   position: relative;
   z-index: 1;
   background: var(--bg);
-  padding-bottom: var(--guess-bar-h);
   justify-content: center;
 }
 
@@ -354,14 +358,15 @@ body::before {
 }
 
 
-/* ── Universal guess bar (fixed, dark, sits below the orange strip) ────────── */
+/* ── Universal guess bar (in-flow flex child of body) ─────────────────────── */
+/* Kept out of position:fixed so it participates in the flex layout that JS
+   resizes to match the visual viewport — this is what keeps it above the
+   keyboard on iOS without the page content shifting. */
 #guess-bar {
-  position: fixed;
-  bottom: var(--vvp-offset, 0px);
-  left: 50%;
-  transform: translateX(-50%);
+  flex-shrink: 0;
   width: 100%;
   max-width: 800px;
+  margin: 0 auto;
   z-index: 15;
   background: rgba(10, 9, 8, 0.98);
   border-top: 1px solid #3A1C08;

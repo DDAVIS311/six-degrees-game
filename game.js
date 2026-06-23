@@ -210,7 +210,12 @@ function pinGuessBarToKeyboard() {
   if (!window.visualViewport) return;
 
   function update() {
-    document.body.style.height = window.visualViewport.height + "px";
+    const vvp = window.visualViewport;
+    // Move the body's top to match wherever iOS has panned the visual viewport,
+    // and shrink height to the visible space above the keyboard.
+    // Both must move together — height alone leaves the body behind the pan offset.
+    document.body.style.top    = vvp.offsetTop  + "px";
+    document.body.style.height = vvp.height     + "px";
   }
 
   window.visualViewport.addEventListener("resize", update);

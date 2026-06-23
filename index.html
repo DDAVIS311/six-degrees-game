@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Six Degrees</title>
+  <meta name="description" content="A daily cinema trivia game. Connect actors through shared films." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Robust amber duotone filter — shared, referenced by all actor photos -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <filter id="gRobust" color-interpolation-filters="sRGB">
+      <feColorMatrix type="matrix" values="0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0.299 0.587 0.114 0 0  0 0 0 1 0"/>
+      <feComponentTransfer>
+        <feFuncR type="table" tableValues="0.039 0.165 0.353 0.525 0.682 0.792 0.878"/>
+        <feFuncG type="table" tableValues="0.027 0.106 0.235 0.361 0.490 0.580 0.675"/>
+        <feFuncB type="table" tableValues="0.016 0.047 0.106 0.157 0.176 0.235 0.322"/>
+      </feComponentTransfer>
+    </filter>
+  </defs></svg>
+
+  <div id="error-msg" hidden></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <span>Loading today's puzzle…</span>
+  </div>
+
+  <!-- Film strip -->
+  <div id="film-strip" hidden>
+    <div id="ladder"></div>
+  </div>
+
+  <!-- Universal guess input — fixed outside the strip -->
+  <div id="guess-bar" hidden>
+    <input
+      id="universal-input"
+      type="text"
+      placeholder="Name a film connecting them…"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    <button id="universal-submit" type="button" aria-label="Submit">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- Game over overlay -->
+  <div id="game-over" hidden role="dialog" aria-modal="true" aria-labelledby="go-title">
+    <div class="game-over-card">
+      <div class="game-over-title" id="go-title">Game Over</div>
+      <div class="game-over-score">
+        <div class="score-num" id="final-score">0</div>
+        <span class="score-label">connections made</span>
+      </div>
+      <div class="game-over-grade" id="final-grade"></div>
+      <div class="countdown-block">
+        <div class="countdown-label">Next puzzle in</div>
+        <div id="countdown">00:00:00</div>
+      </div>
+      <button class="share-btn" id="share-btn" onclick="copyShareText()">Share Result</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="data.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

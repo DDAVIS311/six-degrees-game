@@ -1,0 +1,564 @@
+/* ── Variables ─────────────────────────────────────────────────────────────── */
+:root {
+  --bg:           #0A0908;   /* dark — header, overlays, input bar */
+  --film-base:    #C07030;   /* Kodak orange — the film stock itself */
+  --surface:      #1A1510;
+  --accent:       #C89035;   /* amber */
+  --accent-dim:   #9A6A20;
+  --text:         #E8E0D0;
+  --text-muted:   #7A6040;
+  --failure:      #C0392B;
+  --border:       #3A2A18;
+  --perf-hole:    #E8D5B0;   /* warm cream — light punched through the base */
+
+  --font-display: "Playfair Display", Georgia, serif;
+  --font-body:    "Inter", system-ui, sans-serif;
+  --font-mono:    "Courier New", "Courier", monospace;
+
+  --sz-xs:  0.75rem;
+  --sz-sm:  0.875rem;
+  --sz-md:  1rem;
+  --sz-lg:  1.25rem;
+  --sz-xl:  1.5rem;
+  --sz-2xl: 2rem;
+
+  --radius: 7px;
+  --guess-bar-h: 68px;
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[hidden] { display: none !important; }
+html { font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Film grain (sits behind everything at z-index 0) ──────────────────────── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.5;
+}
+
+/* ── Error banner ──────────────────────────────────────────────────────────── */
+#error-msg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: rgba(192, 57, 43, 0.92);
+  color: #fff;
+  font-size: var(--sz-sm);
+  padding: 0.6rem 1rem;
+  text-align: center;
+}
+
+/* ── Loading ───────────────────────────────────────────────────────────────── */
+#loading {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--sz-sm);
+  letter-spacing: 0.08em;
+  position: relative;
+  z-index: 1;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #3A2A18;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Film strip container ───────────────────────────────────────────────────── */
+#film-strip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-width: 800px;
+  width: 100%;
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+  background: var(--bg);
+  padding-bottom: var(--guess-bar-h);
+  justify-content: center;
+}
+
+/* ── Horizontal scroll ladder ──────────────────────────────────────────────── */
+#ladder {
+  flex: none;
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow-x: scroll;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  background: transparent;
+}
+
+#ladder::-webkit-scrollbar { display: none; }
+
+/* ── Film frame ─────────────────────────────────────────────────────────────── */
+.film-frame {
+  flex-shrink: 0;
+  min-width: 100%;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.film-frame-solved { opacity: 0.55; }
+.film-frame-failed { opacity: 0.7; }
+
+/* Kodak-orange perforation rows */
+.perf-row {
+  height: 32px;
+  flex-shrink: 0;
+  background: #C07030;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+}
+
+.perf-row i {
+  width: 20px;
+  height: 15px;
+  background: #080604;
+  border-radius: 2.5px;
+  display: block;
+  flex-shrink: 0;
+}
+
+/* Film window — holds two actor cells and the floating plate.
+   Explicit height keeps the frame landscape regardless of photo natural sizes. */
+.film-window {
+  position: relative;
+  display: flex;
+  background: #080604;
+  width: 100%;
+  height: clamp(180px, 50vw, 400px);
+  overflow: hidden;
+}
+
+/* Actor cells */
+.actor-cell {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+}
+
+.actor-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Silhouette fallback */
+.actor-cell svg {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 80%;
+  opacity: 0.2;
+}
+
+.cell-vig {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cell-grain {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 90px;
+  mix-blend-mode: overlay;
+  opacity: 0.13;
+}
+
+/* Amber gradient divider */
+.cell-divider {
+  width: 2px;
+  flex: none;
+  background: linear-gradient(#6E4C22, #8A6030, #4A3010);
+}
+
+/* Floating logo + counter plate (active frames) */
+.logo-plate {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  background: rgba(8, 6, 4, 0.6);
+  border: 1px solid #4A3010;
+  border-radius: 4px;
+  backdrop-filter: blur(1px);
+  z-index: 10;
+}
+
+.logo-6deg {
+  font-family: "Alfa Slab One", serif;
+  font-size: clamp(52px, 11vw, 88px);
+  line-height: 0.78;
+  color: #E0AC4C;
+  text-shadow:
+    2px 2px 0 #8A6030,
+    4px 4px 0 #6E4C22,
+    6px 6px 0 #4A3010,
+    8px 8px 0 #321f0a;
+  user-select: none;
+}
+
+.logo-6deg .deg {
+  font-size: 0.4em;
+  vertical-align: super;
+  color: #8A6030;
+  text-shadow: none;
+}
+
+/* Film title / failure hint plate (solved / failed frames) */
+.plate-info {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 22px;
+  background: rgba(8, 6, 4, 0.72);
+  border: 1px solid #4A3010;
+  border-radius: 4px;
+  backdrop-filter: blur(1px);
+  z-index: 10;
+  max-width: 62%;
+  text-align: center;
+}
+
+.plate-film-title {
+  font-family: var(--font-mono);
+  font-size: clamp(9px, 2.4vw, 13px);
+  color: #C89035;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.plate-failed-hint {
+  font-family: var(--font-mono);
+  font-size: clamp(9px, 2.2vw, 12px);
+  color: #8A3030;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  line-height: 1.4;
+}
+
+/* ── Split-flap counter ─────────────────────────────────────────────────────── */
+.sf-counter {
+  display: flex;
+  gap: 6px;
+}
+
+.sf-tile {
+  position: relative;
+  width: 32px;
+  height: 44px;
+  border-radius: 3px;
+  background: #0d0a06;
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  perspective: 240px;
+}
+
+.sf-half {
+  position: absolute;
+  left: 0;
+  width: 32px;
+  height: 22px;
+  overflow: hidden;
+}
+
+.sf-half.top    { top: 0;    background: #1a1208; }
+.sf-half.bottom { bottom: 0; background: #0f0a05; }
+
+.sf-half .g {
+  position: absolute;
+  left: 0;
+  width: 32px;
+  height: 44px;
+  line-height: 44px;
+  text-align: center;
+  font-family: "Alfa Slab One", serif;
+  font-size: 25px;
+  color: #C89035;
+}
+
+.sf-half.top    .g { top: 0; }
+.sf-half.bottom .g { top: -22px; }
+
+.sf-static { z-index: 1; }
+.sf-flap   { z-index: 3; backface-visibility: hidden; }
+.sf-flap.top    { transform-origin: 50% 100%; }
+.sf-flap.bottom { transform-origin: 50% 0%; transform: rotateX(90deg); }
+
+.sf-hinge {
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  transform: translateY(-1px);
+  background: #000;
+  z-index: 4;
+}
+
+
+/* ── Universal guess bar (fixed, dark, sits below the orange strip) ────────── */
+#guess-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 800px;
+  z-index: 15;
+  background: rgba(10, 9, 8, 0.98);
+  border-top: 1px solid #3A1C08;
+  padding: 11px 14px;
+  padding-bottom: calc(11px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#universal-input {
+  flex: 1;
+  min-width: 0;
+  background: #160E04;
+  border: 1px solid #4A3018;
+  border-radius: var(--radius);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  padding: 0.7rem 0.85rem;
+  outline: none;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+#universal-input::placeholder { color: #5A3E1E; }
+
+#universal-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(200, 144, 53, 0.14);
+}
+
+#universal-input:disabled { opacity: 0.35; cursor: not-allowed; }
+
+#universal-submit {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--bg);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  transition: background 150ms ease, transform 100ms ease;
+}
+
+#universal-submit:hover  { background: #B07820; }
+#universal-submit:active { transform: scale(0.94); }
+#universal-submit:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
+#universal-submit svg { width: 18px; height: 18px; }
+
+/* ── Shake ─────────────────────────────────────────────────────────────────── */
+@keyframes shake-input {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-7px); }
+  40%       { transform: translateX(7px); }
+  60%       { transform: translateX(-4px); }
+  80%       { transform: translateX(4px); }
+}
+.shake { animation: shake-input 0.35s ease; }
+
+/* ── Game over overlay ─────────────────────────────────────────────────────── */
+#game-over {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: rgba(10, 9, 8, 0.9);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  opacity: 0;
+  transition: opacity 350ms ease;
+}
+
+#game-over.visible { opacity: 1; }
+
+.game-over-card {
+  background: #1A1510;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 2rem 1.5rem;
+  max-width: 360px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+  text-align: center;
+}
+
+.game-over-title {
+  font-family: var(--font-display);
+  font-size: var(--sz-2xl);
+  font-style: italic;
+  color: var(--accent);
+  letter-spacing: 0.08em;
+}
+
+.game-over-score { font-variant-numeric: tabular-nums; }
+
+.game-over-score .score-num {
+  font-family: var(--font-display);
+  font-size: 4rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.game-over-score .score-label {
+  font-family: var(--font-mono);
+  font-size: var(--sz-xs);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.game-over-grade {
+  font-family: var(--font-display);
+  font-size: var(--sz-lg);
+  color: var(--text);
+  font-style: italic;
+}
+
+.countdown-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.countdown-label {
+  font-family: var(--font-mono);
+  font-size: var(--sz-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+#countdown {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--sz-xl);
+  color: var(--text);
+  letter-spacing: 0.08em;
+}
+
+.share-btn {
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius);
+  color: var(--bg);
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: var(--sz-sm);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.7rem 1.5rem;
+  width: 100%;
+  transition: background 150ms ease;
+}
+
+.share-btn:hover { background: #B07820; }
+
+/* ── Responsive ────────────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  /* Tighter perf rows on narrow phones */
+  .perf-row {
+    height: 24px;
+    padding: 0 10px;
+  }
+  .perf-row i {
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+  }
+
+  /* Taller window on mobile so faces fill more of the screen */
+  .film-window {
+    height: clamp(160px, 65vw, 400px);
+  }
+
+  /* Compact logo plate so it doesn't dominate the smaller window */
+  .logo-plate {
+    padding: 10px 18px;
+    gap: 8px;
+  }
+
+  /* Solved/failed info plate */
+  .plate-info {
+    padding: 10px 16px;
+    max-width: 72%;
+  }
+}

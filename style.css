@@ -35,7 +35,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-body);
-  height: 100dvh;
+  height: 100svh;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -560,5 +560,11 @@ body::before {
   .plate-info {
     padding: 10px 16px;
     max-width: 72%;
+  }
+
+  /* Prevent iOS Safari from zooming + scrolling to focused inputs.
+     Any font-size < 16px triggers the auto-zoom behaviour. */
+  #universal-input {
+    font-size: 16px;
   }
 }

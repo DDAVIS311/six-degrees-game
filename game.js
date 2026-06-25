@@ -89,11 +89,14 @@ async function fetchCoStars(actorId, excludeIds = []) {
   return Object.values(coStarMap).sort((a, b) => b.popularity - a.popularity);
 }
 
-async function pickNextCoStar(actorId, excludeIds) {
+async function pickNextCoStar(actorId, excludeIds, step = 0) {
   let pool = await fetchCoStars(actorId, excludeIds);
   if (pool.length === 0) pool = await fetchCoStarsExpanded(actorId, excludeIds, 15);
   if (pool.length === 0) return null;
-  const top = pool.slice(0, 20);
+  // Narrow the selection window early so the chain starts with recognisable names,
+  // then opens up as the chain grows. Pool is already sorted by TMDB popularity desc.
+  const topN = step < 3 ? 5 : step < 6 ? 10 : 20;
+  const top = pool.slice(0, Math.min(topN, pool.length));
   const pick = top[Math.floor(Math.random() * top.length)];
   const full = await fetchActorData(pick.id);
   if (full.adult) return null;
@@ -285,7 +288,7 @@ async function onCorrectGuess(pair, result) {
   renderPairSolved(pair);
 
   const excludeIds = gameState.ladder.map(a => a.id);
-  const newActor = await pickNextCoStar(pair.actorB.id, excludeIds);
+  const newActor = await pickNextCoStar(pair.actorB.id, excludeIds, gameState.score);
 
   if (!newActor) {
     checkGameOver();
@@ -407,6 +410,11 @@ function buildActorCell(actor, side) {
   grain.className = "cell-grain";
   grain.style.backgroundImage = GRAIN_BG;
   cell.appendChild(grain);
+
+  const nameEl = document.createElement("div");
+  nameEl.className = "actor-name";
+  nameEl.textContent = actor.name;
+  cell.appendChild(nameEl);
 
   return cell;
 }

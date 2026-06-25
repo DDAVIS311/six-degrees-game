@@ -166,6 +166,27 @@ body::before {
   flex-shrink: 0;
 }
 
+/* Actor name label — bottom of each cell */
+.actor-name {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 6px 5px;
+  background: linear-gradient(transparent, rgba(8,6,4,0.88));
+  font-family: var(--font-mono);
+  font-size: clamp(9px, 2.2vw, 12px);
+  color: #E8D5B0;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  z-index: 5;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Film window — holds two actor cells and the floating plate.
    Explicit height keeps the frame landscape regardless of photo natural sizes. */
 .film-window {
@@ -288,9 +309,9 @@ body::before {
 
 .plate-film-title {
   font-family: var(--font-mono);
-  font-size: clamp(9px, 2.4vw, 13px);
+  font-size: clamp(11px, 3vw, 14px);
   color: #C89035;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.10em;
   text-transform: uppercase;
   line-height: 1.5;
   white-space: pre-line;
@@ -298,9 +319,9 @@ body::before {
 
 .plate-failed-hint {
   font-family: var(--font-mono);
-  font-size: clamp(9px, 2.2vw, 12px);
-  color: #8A3030;
-  letter-spacing: 0.08em;
+  font-size: clamp(10px, 2.8vw, 13px);
+  color: #C05040;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   line-height: 1.4;
 }

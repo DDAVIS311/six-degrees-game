@@ -45,11 +45,11 @@ async function fetchActorData(id) {
   return apiFetch(`/person/${id}?append_to_response=movie_credits`);
 }
 
-function filterCredits(credits) {
+function filterCredits(credits, minVotes = CONFIG.MIN_VOTE_COUNT) {
   if (!credits?.cast) return [];
   return credits.cast.filter(m =>
     !m.adult && !m.video &&
-    m.vote_count > CONFIG.MIN_VOTE_COUNT &&
+    m.vote_count > minVotes &&
     (m.order === undefined || m.order < CONFIG.MAX_CAST_ORDER) &&
     !m.genre_ids?.some(g => CONFIG.ADULT_GENRE_IDS.includes(g))
   );
@@ -72,10 +72,10 @@ async function fetchFilmCast(movieId) {
   return (data.cast || []).filter(p => !p.adult && p.order < CONFIG.MAX_CAST_ORDER);
 }
 
-async function fetchCoStars(actorId, excludeIds = []) {
+async function fetchCoStars(actorId, excludeIds = [], minVotes = CONFIG.MIN_VOTE_COUNT) {
   const person = await fetchActorData(actorId);
   if (person.adult) return [];
-  const credits = filterCredits(person.movie_credits);
+  const credits = filterCredits(person.movie_credits, minVotes);
   const coStarMap = {};
   await Promise.all(credits.slice(0, 15).map(async film => {
     try {
@@ -90,12 +90,18 @@ async function fetchCoStars(actorId, excludeIds = []) {
 }
 
 async function pickNextCoStar(actorId, excludeIds, step = 0) {
-  let pool = await fetchCoStars(actorId, excludeIds);
+  // Scale both actor pool width and film vote threshold by chain depth.
+  // topN: narrow early so only popular co-stars get picked.
+  // minVotes: high early so chains only go through well-known films.
+  const topN     = step < 3 ? 5  : step < 6 ? 10 : 20;
+  const minVotes = step < 3 ? 3000 : step < 6 ? 1000 : CONFIG.MIN_VOTE_COUNT;
+
+  let pool = await fetchCoStars(actorId, excludeIds, minVotes);
+  // Fall back to looser thresholds if the tighter filter yields nothing
+  if (pool.length === 0) pool = await fetchCoStars(actorId, excludeIds, CONFIG.MIN_VOTE_COUNT);
   if (pool.length === 0) pool = await fetchCoStarsExpanded(actorId, excludeIds, 15);
   if (pool.length === 0) return null;
-  // Narrow the selection window early so the chain starts with recognisable names,
-  // then opens up as the chain grows. Pool is already sorted by TMDB popularity desc.
-  const topN = step < 3 ? 5 : step < 6 ? 10 : 20;
+  // Pool is sorted by TMDB popularity desc; slice to the difficulty window.
   const top = pool.slice(0, Math.min(topN, pool.length));
   const pick = top[Math.floor(Math.random() * top.length)];
   const full = await fetchActorData(pick.id);

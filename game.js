@@ -75,7 +75,10 @@ async function fetchFilmCast(movieId) {
 async function fetchCoStars(actorId, excludeIds = [], minVotes = CONFIG.MIN_VOTE_COUNT) {
   const person = await fetchActorData(actorId);
   if (person.adult) return [];
-  const credits = filterCredits(person.movie_credits, minVotes);
+  // Sort by vote_count desc before slicing so we always look at the actor's
+  // most widely-seen films first, not TMDB's arbitrary ordering.
+  const credits = filterCredits(person.movie_credits, minVotes)
+    .sort((a, b) => (b.vote_count || 0) - (a.vote_count || 0));
   const coStarMap = {};
   await Promise.all(credits.slice(0, 15).map(async film => {
     try {
@@ -93,8 +96,8 @@ async function pickNextCoStar(actorId, excludeIds, step = 0) {
   // Scale both actor pool width and film vote threshold by chain depth.
   // topN: narrow early so only popular co-stars get picked.
   // minVotes: high early so chains only go through well-known films.
-  const topN     = step < 3 ? 5  : step < 6 ? 10 : 20;
-  const minVotes = step < 3 ? 3000 : step < 6 ? 1000 : CONFIG.MIN_VOTE_COUNT;
+  const topN     = step < 3 ? 5   : step < 6 ? 10 : 20;
+  const minVotes = step < 3 ? 10000 : step < 6 ? 3000 : CONFIG.MIN_VOTE_COUNT;
 
   let pool = await fetchCoStars(actorId, excludeIds, minVotes);
   // Fall back to looser thresholds if the tighter filter yields nothing

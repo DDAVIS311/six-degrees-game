@@ -6,7 +6,7 @@ const CONFIG = {
   CACHE_TTL: 600000,       // 10 minutes in ms
   MAX_CAST_ORDER: 10,      // top-billed only
   MIN_VOTE_COUNT: 100,
-  ADULT_GENRE_IDS: [10749],
+  ADULT_GENRE_IDS: [],   // adult movies are caught by m.adult flag; 10749=Romance is mainstream
   DEBOUNCE_MS: 300,
   RETRY_DELAY_MS: 1000,
 };

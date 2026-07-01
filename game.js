@@ -144,8 +144,10 @@ function fuzzyMatch(guess, target) {
   const g = normalizeTitle(guess);
   const t = normalizeTitle(target);
   if (g === t) return true;
-  if (t.includes(g) && g.length / t.length >= 0.8) return true;
-  if (g.includes(t) && t.length / g.length >= 0.8) return true;
+  // Allow shortened titles ("Benjamin Button" for "The Curious Case of Benjamin Button")
+  // but require ≥8 chars to avoid short generic words matching unrelated films.
+  if (t.includes(g) && g.length >= 8 && g.length / t.length >= 0.4) return true;
+  if (g.includes(t) && t.length >= 8 && t.length / g.length >= 0.4) return true;
   return false;
 }
 

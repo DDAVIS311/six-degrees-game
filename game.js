@@ -93,23 +93,36 @@ async function fetchCoStars(actorId, excludeIds = [], minVotes = CONFIG.MIN_VOTE
 }
 
 async function pickNextCoStar(actorId, excludeIds, step = 0) {
-  // Scale both actor pool width and film vote threshold by chain depth.
-  // topN: narrow early so only popular co-stars get picked.
-  // minVotes: high early so chains only go through well-known films.
   const topN     = step < 3 ? 5   : step < 6 ? 10 : 20;
   const minVotes = step < 3 ? 10000 : step < 6 ? 3000 : CONFIG.MIN_VOTE_COUNT;
 
   let pool = await fetchCoStars(actorId, excludeIds, minVotes);
-  // Fall back to looser thresholds if the tighter filter yields nothing
   if (pool.length === 0) pool = await fetchCoStars(actorId, excludeIds, CONFIG.MIN_VOTE_COUNT);
   if (pool.length === 0) pool = await fetchCoStarsExpanded(actorId, excludeIds, 15);
   if (pool.length === 0) return null;
-  // Pool is sorted by TMDB popularity desc; slice to the difficulty window.
+
+  // Build the current actor's permissive film set once so we can validate
+  // that each candidate shares at least one *unused* film before committing.
+  // Without this check, we can pick a co-star who was only connected through
+  // the film just used as the answer, leaving the new pair with no valid moves.
+  const currentData    = await fetchActorData(actorId);
+  const currentFilmIds = new Set(filterCredits(currentData.movie_credits).map(m => m.id));
+
+  // Shuffle within the difficulty window so we don't always pick the
+  // highest-popularity actor (adds variety across plays).
   const top = pool.slice(0, Math.min(topN, pool.length));
-  const pick = top[Math.floor(Math.random() * top.length)];
-  const full = await fetchActorData(pick.id);
-  if (full.adult) return null;
-  return buildActorObj(full, filterCredits(full.movie_credits));
+  const shuffled = top.slice().sort(() => Math.random() - 0.5);
+
+  for (const candidate of shuffled) {
+    const full = await fetchActorData(candidate.id);
+    if (full.adult) continue;
+    const candidateCredits = filterCredits(full.movie_credits);
+    const hasUnusedSharedFilm = candidateCredits.some(
+      m => currentFilmIds.has(m.id) && !gameState.usedFilmIds.has(m.id)
+    );
+    if (hasUnusedSharedFilm) return buildActorObj(full, candidateCredits);
+  }
+  return null;
 }
 
 async function fetchCoStarsExpanded(actorId, excludeIds, orderLimit) {
@@ -132,12 +145,15 @@ async function fetchCoStarsExpanded(actorId, excludeIds, orderLimit) {
 
 // ── Guess validation ──────────────────────────────────────────────────────────
 
+const ROMAN_MAP = { viii:8, vii:7, xii:12, xi:11, vi:6, ix:9, iv:4, iii:3, ii:2, x:10, v:5, i:1 };
 function normalizeTitle(t) {
   return t.toLowerCase()
     .replace(/^(the|a|an)\s+/i, "")
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")
-    .trim();
+    .trim()
+    // Unify Roman numerals and Arabic digits so "III" == "3", "MI3" == "MI III"
+    .replace(/\b(viii|vii|xii|xi|vi|ix|iv|iii|ii|x|v|i)\b/g, m => ROMAN_MAP[m]);
 }
 
 function fuzzyMatch(guess, target) {

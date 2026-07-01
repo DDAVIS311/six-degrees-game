@@ -116,6 +116,13 @@ async function pickNextCoStar(actorId, excludeIds, step = 0) {
   for (const candidate of shuffled) {
     const full = await fetchActorData(candidate.id);
     if (full.adult) continue;
+
+    // Require at least 4 films with 5000+ votes — filters out TV actors
+    // (e.g. Yellowstone cast) who have high TMDB popularity from TV work
+    // but only a handful of minor movie appearances.
+    const filmCareer = filterCredits(full.movie_credits, 5000);
+    if (filmCareer.length < 4) continue;
+
     const candidateCredits = filterCredits(full.movie_credits);
     const hasUnusedSharedFilm = candidateCredits.some(
       m => currentFilmIds.has(m.id) && !gameState.usedFilmIds.has(m.id)

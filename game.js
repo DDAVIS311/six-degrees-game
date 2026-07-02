@@ -187,15 +187,20 @@ async function validateGuess(actorAId, actorBId, guess) {
 
 // ── Game initialization ───────────────────────────────────────────────────────
 
-function getTodaysSeed() {
+async function getTodaysSeed() {
   const today = new Date().toISOString().slice(0, 10);
+  try {
+    const r = await fetch("/api/daily");
+    if (r.ok) return await r.json();
+  } catch (_) {}
+  // Fall back to local hand-curated seeds (data.js)
   return DAILY_SEEDS.find(s => s.date === today) || DAILY_SEEDS[0];
 }
 
 async function initGame() {
   showLoading(true);
   try {
-    const seed = getTodaysSeed();
+    const seed = await getTodaysSeed();
     gameState.date = seed.date;
 
     const [dataA, dataB] = await Promise.all([

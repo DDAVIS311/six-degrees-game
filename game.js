@@ -200,6 +200,13 @@ async function getTodaysSeed() {
 async function initGame() {
   showLoading(true);
   try {
+    // If the player already finished today's puzzle, restore the result screen
+    const saved = loadTodayState();
+    if (saved?.gameOver) {
+      restoreGameOver(saved);
+      return;
+    }
+
     const seed = await getTodaysSeed();
     gameState.date = seed.date;
 
@@ -211,7 +218,7 @@ async function initGame() {
     const actorB = buildActorObj(dataB, filterCredits(dataB.movie_credits));
 
     gameState.ladder = [actorA, actorB];
-    gameState.activePairs = [{ actorA, actorB, status: "active", id: "pair-0" }];
+    gameState.activePairs = [{ actorA, actorB, status: "active", id: "pair-0", direction: "initial" }];
 
     renderLadder();
     showFilmStrip(true);
@@ -226,6 +233,44 @@ async function initGame() {
   } finally {
     showLoading(false);
   }
+}
+
+// ── Daily-play persistence (localStorage) ────────────────────────────────────
+
+const STORAGE_KEY = "sixdegrees-daily";
+
+function saveTodayState() {
+  const today = new Date().toISOString().slice(0, 10);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({
+    date:    today,
+    score:   gameState.score,
+    ladder:  gameState.ladder.map(a => a.name),
+    gameOver: true,
+  }));
+}
+
+function loadTodayState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0, 10);
+    return data.date === today ? data : null;
+  } catch (_) { return null; }
+}
+
+function restoreGameOver(saved) {
+  gameState.date   = saved.date;
+  gameState.score  = saved.score;
+  gameState.gameOver = true;
+  showLoading(false);
+  showFilmStrip(false);
+  document.getElementById("final-score").textContent = saved.score;
+  document.getElementById("final-grade").textContent = getGrade(saved.score);
+  startMidnightCountdown();
+  const overlay = document.getElementById("game-over");
+  overlay.hidden = false;
+  requestAnimationFrame(() => overlay.classList.add("visible"));
 }
 
 // ── Universal input ───────────────────────────────────────────────────────────
@@ -273,8 +318,10 @@ function doUniversalSubmit() {
   const guess = input.value.trim();
   if (!guess) { shakeUniversalInput(); return; }
 
-  // In the linear chain there is always exactly one active pair
-  const pair = gameState.activePairs.find(p => p.status === "active");
+  // Target the rightmost active pair (last in array) — the one scrolled into view.
+  // If it fails, the leftmost active pair (if any) keeps the game alive.
+  const active = gameState.activePairs.filter(p => p.status === "active");
+  const pair = active[active.length - 1];
   if (!pair) return;
 
   input.value = "";
@@ -327,27 +374,51 @@ async function onCorrectGuess(pair, result) {
   renderPairSolved(pair);
 
   const excludeIds = gameState.ladder.map(a => a.id);
-  const newActor = await pickNextCoStar(pair.actorB.id, excludeIds, gameState.score);
+  const ladderEl  = document.getElementById("ladder");
+  let rightActor  = null;
+  let leftActor   = null;
 
-  if (!newActor) {
+  if (pair.direction === "left") {
+    // Left-end pair: extend further left from actorA
+    leftActor = await pickNextCoStar(pair.actorA.id, excludeIds, gameState.score);
+  } else {
+    // Right-end pair (or initial): extend right from actorB
+    rightActor = await pickNextCoStar(pair.actorB.id, excludeIds, gameState.score);
+
+    // On the very first solve also extend left from actorA, giving two live pairs
+    if (pair.direction === "initial") {
+      const extra = rightActor ? [...excludeIds, rightActor.id] : excludeIds;
+      leftActor = await pickNextCoStar(pair.actorA.id, extra, gameState.score);
+    }
+  }
+
+  if (!rightActor && !leftActor) {
     checkGameOver();
     return;
   }
 
-  gameState.ladder.push(newActor);
-  const newPair = {
-    actorA: pair.actorB,
-    actorB: newActor,
-    status: "active",
-    id: `pair-${Date.now()}`,
-  };
-  gameState.activePairs.push(newPair);
+  // Add left pair first (prepend DOM, push to activePairs)
+  if (leftActor) {
+    gameState.ladder.unshift(leftActor);
+    const lp = { actorA: leftActor, actorB: pair.actorA, status: "active", id: `pair-${Date.now() - 1}`, direction: "left" };
+    gameState.activePairs.push(lp);
+    ladderEl.insertBefore(buildFilmFrame(lp), ladderEl.firstChild);
+  }
 
-  document.getElementById("ladder").appendChild(buildFilmFrame(newPair));
+  // Add right pair last (append DOM, push to activePairs) — becomes the primary active pair
+  if (rightActor) {
+    gameState.ladder.push(rightActor);
+    const rp = { actorA: pair.actorB, actorB: rightActor, status: "active", id: `pair-${Date.now()}`, direction: "right" };
+    gameState.activePairs.push(rp);
+    ladderEl.appendChild(buildFilmFrame(rp));
+  }
+
   scrollToActiveFrame();
 
-  // Pre-fetch next co-star (non-blocking)
-  fetchCoStars(newActor.id, [...excludeIds, newActor.id]).catch(() => {});
+  // Pre-fetch next co-stars (non-blocking)
+  const newExcludes = [...excludeIds, rightActor?.id, leftActor?.id].filter(Boolean);
+  if (rightActor) fetchCoStars(rightActor.id, newExcludes).catch(() => {});
+  if (leftActor)  fetchCoStars(leftActor.id,  newExcludes).catch(() => {});
 }
 
 function onIncorrectGuess(pair, result) {
@@ -362,6 +433,7 @@ function checkGameOver() {
   const stillActive = gameState.activePairs.some(p => p.status === "active");
   if (!stillActive) {
     gameState.gameOver = true;
+    saveTodayState();
     setTimeout(() => renderGameOver(), 600);
   }
 }
@@ -635,10 +707,11 @@ function renderPairFailed(pair) {
 
 function scrollToActiveFrame() {
   const container = document.getElementById("ladder");
-  const active = container.querySelector(".film-frame-active");
-  if (active) {
-    container.scrollTo({ left: active.offsetLeft, behavior: "smooth" });
-  }
+  // Scroll to the rightmost active frame — that's the primary pair the user works on.
+  // If the right pair fails, the next scroll will land on the left pair.
+  const all = container.querySelectorAll(".film-frame-active");
+  const target = all[all.length - 1];
+  if (target) container.scrollTo({ left: target.offsetLeft, behavior: "smooth" });
 }
 
 // ── Keyboard navigation (arrow keys on desktop) ───────────────────────────────

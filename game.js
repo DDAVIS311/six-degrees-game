@@ -413,6 +413,11 @@ async function onCorrectGuess(pair, result) {
     ladderEl.appendChild(buildFilmFrame(rp));
   }
 
+  // Once there are multiple frames, switch to the peek carousel layout
+  if (ladderEl.children.length > 1) {
+    ladderEl.classList.add("ladder-multi");
+  }
+
   scrollToActiveFrame();
 
   // Pre-fetch next co-stars (non-blocking)
@@ -707,11 +712,17 @@ function renderPairFailed(pair) {
 
 function scrollToActiveFrame() {
   const container = document.getElementById("ladder");
-  // Scroll to the rightmost active frame — that's the primary pair the user works on.
-  // If the right pair fails, the next scroll will land on the left pair.
   const all = container.querySelectorAll(".film-frame-active");
   const target = all[all.length - 1];
-  if (target) container.scrollTo({ left: target.offsetLeft, behavior: "smooth" });
+  if (!target) return;
+
+  if (container.classList.contains("ladder-multi")) {
+    // In peek mode frames snap to center — scroll so the frame is centred in view
+    const scrollLeft = target.offsetLeft - (container.offsetWidth - target.offsetWidth) / 2;
+    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+  } else {
+    container.scrollTo({ left: target.offsetLeft, behavior: "smooth" });
+  }
 }
 
 // ── Keyboard navigation (arrow keys on desktop) ───────────────────────────────

@@ -174,10 +174,21 @@ function fuzzyMatch(guess, target) {
   return false;
 }
 
+// Permissive filter for guess validation — no cast-order cap so ensemble films
+// (large casts where stars are billed beyond position 10) are never excluded.
+function filterCreditsForGuessing(credits) {
+  if (!credits?.cast) return [];
+  return credits.cast.filter(m =>
+    !m.adult && !m.video &&
+    m.vote_count > 50 &&
+    !m.genre_ids?.some(g => CONFIG.ADULT_GENRE_IDS.includes(g))
+  );
+}
+
 async function validateGuess(actorAId, actorBId, guess) {
   const [dataA, dataB] = await Promise.all([fetchActorData(actorAId), fetchActorData(actorBId)]);
-  const creditsA = filterCredits(dataA.movie_credits);
-  const creditsB = filterCredits(dataB.movie_credits);
+  const creditsA = filterCreditsForGuessing(dataA.movie_credits);
+  const creditsB = filterCreditsForGuessing(dataB.movie_credits);
   const idsB = new Set(creditsB.map(m => m.id));
   const shared = creditsA.filter(m => idsB.has(m.id) && !gameState.usedFilmIds.has(m.id));
   const match = shared.find(m => fuzzyMatch(guess, m.title));

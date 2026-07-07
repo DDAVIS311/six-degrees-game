@@ -318,14 +318,11 @@ function doUniversalSubmit() {
   const guess = input.value.trim();
   if (!guess) { shakeUniversalInput(); return; }
 
-  // Target the rightmost active pair (last in array) — the one scrolled into view.
-  // If it fails, the leftmost active pair (if any) keeps the game alive.
   const active = gameState.activePairs.filter(p => p.status === "active");
-  const pair = active[active.length - 1];
-  if (!pair) return;
+  if (!active.length) return;
 
   input.value = "";
-  handleGuess(pair.id, guess);
+  handleGuessMulti(active, guess);
 
   submitDebounceTimer = setTimeout(() => { submitDebounceTimer = null; }, CONFIG.DEBOUNCE_MS);
 }
@@ -356,6 +353,30 @@ async function handleGuess(pairId, guess) {
     const result = await validateGuess(pair.actorA.id, pair.actorB.id, guess);
     if (result.correct) await onCorrectGuess(pair, result);
     else onIncorrectGuess(pair, result);
+  } catch (err) {
+    console.error(err);
+    showError("Connection error. Please try again.");
+  } finally {
+    setInputLoading(false);
+  }
+}
+
+// Validates a guess against every active pair simultaneously.
+// First correct match wins; if none match, fails the rightmost (primary) pair.
+async function handleGuessMulti(activePairs, guess) {
+  setInputLoading(true);
+  try {
+    const results = await Promise.all(
+      activePairs.map(p =>
+        validateGuess(p.actorA.id, p.actorB.id, guess).then(r => ({ pair: p, result: r }))
+      )
+    );
+    const match = results.find(r => r.result.correct);
+    if (match) {
+      await onCorrectGuess(match.pair, match.result);
+    } else {
+      onIncorrectGuess(results[results.length - 1].pair, results[results.length - 1].result);
+    }
   } catch (err) {
     console.error(err);
     showError("Connection error. Please try again.");
@@ -493,6 +514,18 @@ function buildFilmFrame(pair) {
 
 // ── Film frame structure helpers ──────────────────────────────────────────────
 
+// For expansion pairs (direction left/right), swap which actor sits on which side
+// so the NEW actor faces inward and is visible in the carousel peek.
+// Left pair: actorA=newActor, actorB=innerActor → display [innerActor | newActor]
+// Right pair: actorA=innerActor, actorB=newActor → display [newActor | innerActor]
+// Both cases reduce to: for expansion pairs, show actorB on left, actorA on right.
+function getDisplayActors(pair) {
+  if (pair.direction && pair.direction !== "initial") {
+    return [pair.actorB, pair.actorA];
+  }
+  return [pair.actorA, pair.actorB];
+}
+
 function buildPerfRow() {
   const row = document.createElement("div");
   row.className = "perf-row";
@@ -613,11 +646,12 @@ function buildSFCounter(initialScore) {
 function buildActiveContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
+  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(pair.actorA, "left"));
+  win.appendChild(buildActorCell(left, "left"));
   win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(pair.actorB, "right"));
+  win.appendChild(buildActorCell(right, "right"));
 
   const plate = document.createElement("div");
   plate.className = "logo-plate";
@@ -636,11 +670,12 @@ function buildActiveContent(frame, pair) {
 function buildSolvedContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
+  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(pair.actorA, "left"));
+  win.appendChild(buildActorCell(left, "left"));
   win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(pair.actorB, "right"));
+  win.appendChild(buildActorCell(right, "right"));
 
   const plate = document.createElement("div");
   plate.className = "plate-info";
@@ -658,11 +693,12 @@ function buildSolvedContent(frame, pair) {
 function buildFailedContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
+  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(pair.actorA, "left"));
+  win.appendChild(buildActorCell(left, "left"));
   win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(pair.actorB, "right"));
+  win.appendChild(buildActorCell(right, "right"));
 
   const plate = document.createElement("div");
   plate.className = "plate-info";

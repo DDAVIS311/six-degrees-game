@@ -329,11 +329,11 @@ function doUniversalSubmit() {
   const guess = input.value.trim();
   if (!guess) { shakeUniversalInput(); return; }
 
-  const active = gameState.activePairs.filter(p => p.status === "active");
-  if (!active.length) return;
+  const pair = getPairInView();
+  if (!pair) return;
 
   input.value = "";
-  handleGuessMulti(active, guess);
+  handleGuessMulti([pair], guess);
 
   submitDebounceTimer = setTimeout(() => { submitDebounceTimer = null; }, CONFIG.DEBOUNCE_MS);
 }
@@ -450,7 +450,16 @@ async function onCorrectGuess(pair, result) {
     ladderEl.classList.add("ladder-multi");
   }
 
-  scrollToActiveFrame();
+  if (pair.direction === "initial") {
+    // After the first solve, centre on the solved pair so both new actors
+    // peek in from each side — lets the user see both options at once.
+    requestAnimationFrame(() => {
+      const solvedEl = document.querySelector(`[data-pair-id="${pair.id}"]`);
+      if (solvedEl) scrollToFrame(solvedEl);
+    });
+  } else {
+    scrollToActiveFrame();
+  }
 
   // Pre-fetch next co-stars (non-blocking)
   const newExcludes = [...excludeIds, rightActor?.id, leftActor?.id].filter(Boolean);
@@ -757,19 +766,43 @@ function renderPairFailed(pair) {
   buildFailedContent(frame, pair);
 }
 
+function scrollToFrame(el) {
+  const container = document.getElementById("ladder");
+  if (container.classList.contains("ladder-multi")) {
+    const scrollLeft = el.offsetLeft - (container.offsetWidth - el.offsetWidth) / 2;
+    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
+  } else {
+    container.scrollTo({ left: el.offsetLeft, behavior: "smooth" });
+  }
+}
+
 function scrollToActiveFrame() {
   const container = document.getElementById("ladder");
   const all = container.querySelectorAll(".film-frame-active");
   const target = all[all.length - 1];
-  if (!target) return;
+  if (target) scrollToFrame(target);
+}
 
-  if (container.classList.contains("ladder-multi")) {
-    // In peek mode frames snap to center — scroll so the frame is centred in view
-    const scrollLeft = target.offsetLeft - (container.offsetWidth - target.offsetWidth) / 2;
-    container.scrollTo({ left: Math.max(0, scrollLeft), behavior: "smooth" });
-  } else {
-    container.scrollTo({ left: target.offsetLeft, behavior: "smooth" });
+// Returns the active pair whose frame is currently closest to the viewport centre.
+// Used to target validation at only what the user is looking at.
+function getPairInView() {
+  const container = document.getElementById("ladder");
+  const viewCenter = container.scrollLeft + container.offsetWidth / 2;
+  const frames = Array.from(container.querySelectorAll(".film-frame"));
+
+  let closest = null, closestDist = Infinity;
+  for (const frame of frames) {
+    const dist = Math.abs((frame.offsetLeft + frame.offsetWidth / 2) - viewCenter);
+    if (dist < closestDist) { closestDist = dist; closest = frame; }
   }
+
+  if (!closest) return null;
+  const pair = gameState.activePairs.find(p => p.id === closest.dataset.pairId && p.status === "active");
+  if (pair) return pair;
+
+  // Centred frame is solved/failed — fall back to the last active pair
+  const active = gameState.activePairs.filter(p => p.status === "active");
+  return active[active.length - 1] || null;
 }
 
 // ── Keyboard navigation (arrow keys on desktop) ───────────────────────────────

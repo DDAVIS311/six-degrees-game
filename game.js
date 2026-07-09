@@ -674,45 +674,21 @@ function buildSFCounter(initialScore) {
 function buildActiveContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
+  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
+  win.appendChild(buildActorCell(left, "left"));
+  win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
+  win.appendChild(buildActorCell(right, "right"));
 
-  const isExpansion = pair.direction && pair.direction !== "initial";
-
-  if (isExpansion) {
-    // For left pairs: actorA = new outer actor, actorB = connecting actor
-    // For right pairs: actorA = connecting actor, actorB = new outer actor
-    const newActor       = pair.direction === "left" ? pair.actorA : pair.actorB;
-    const connectingName = pair.direction === "left" ? pair.actorB.name : pair.actorA.name;
-    win.appendChild(buildActorCell(newActor, "left"));
-
-    const plate = document.createElement("div");
-    plate.className = "logo-plate";
-    const logo = document.createElement("div");
-    logo.className = "logo-6deg";
-    logo.innerHTML = '6<span class="deg">°</span>';
-    plate.appendChild(logo);
-    plate.appendChild(buildSFCounter(gameState.score));
-    const hint = document.createElement("div");
-    hint.className = "connects-to-hint";
-    hint.textContent = `+ ${connectingName}`;
-    plate.appendChild(hint);
-    win.appendChild(plate);
-  } else {
-    const [left, right] = getDisplayActors(pair);
-    win.appendChild(buildActorCell(left, "left"));
-    win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-    win.appendChild(buildActorCell(right, "right"));
-
-    const plate = document.createElement("div");
-    plate.className = "logo-plate";
-    const logo = document.createElement("div");
-    logo.className = "logo-6deg";
-    logo.innerHTML = '6<span class="deg">°</span>';
-    plate.appendChild(logo);
-    plate.appendChild(buildSFCounter(gameState.score));
-    win.appendChild(plate);
-  }
+  const plate = document.createElement("div");
+  plate.className = "logo-plate";
+  const logo = document.createElement("div");
+  logo.className = "logo-6deg";
+  logo.innerHTML = '6<span class="deg">°</span>';
+  plate.appendChild(logo);
+  plate.appendChild(buildSFCounter(gameState.score));
+  win.appendChild(plate);
 
   frame.appendChild(win);
   frame.appendChild(buildPerfRow());

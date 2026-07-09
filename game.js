@@ -452,11 +452,16 @@ async function onCorrectGuess(pair, result) {
 
   if (pair.direction === "initial") {
     // After the first solve, centre on the solved pair so both new actors
-    // peek in from each side — lets the user see both options at once.
-    requestAnimationFrame(() => {
-      const solvedEl = document.querySelector(`[data-pair-id="${pair.id}"]`);
-      if (solvedEl) scrollToFrame(solvedEl);
-    });
+    // peek in from each side. Use setTimeout(0) + direct scrollLeft assignment
+    // so the layout has fully settled and scroll-snap can't override the target.
+    const solvedId = pair.id;
+    setTimeout(() => {
+      const container = document.getElementById("ladder");
+      const solvedEl  = container.querySelector(`[data-pair-id="${solvedId}"]`);
+      if (!solvedEl) return;
+      const left = solvedEl.offsetLeft - (container.offsetWidth - solvedEl.offsetWidth) / 2;
+      container.scrollLeft = Math.max(0, left);
+    }, 0);
   } else {
     scrollToActiveFrame();
   }

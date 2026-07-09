@@ -295,6 +295,19 @@ body::before {
   user-select: none;
 }
 
+.connects-to-hint {
+  font-family: var(--font-mono, monospace);
+  font-size: clamp(9px, 2vw, 12px);
+  color: #9A6A20;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
 .logo-6deg .deg {
   font-size: 0.4em;
   vertical-align: super;

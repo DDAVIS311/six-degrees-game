@@ -11,9 +11,8 @@ const FACE_ANCHOR = "50% 20%";
 
 const GRAIN_BG = "url('data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20width=%22100%22%20height=%22100%22%3E%3Cfilter%20id=%22n%22%3E%3CfeTurbulence%20type=%22fractalNoise%22%20baseFrequency=%220.85%22%20numOctaves=%222%22%20stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect%20width=%22100%22%20height=%22100%22%20filter=%22url(%23n)%22/%3E%3C/svg%3E')";
 
-// Live split-flap counter handles — reset each time a new active frame is built
-let sfTiles = [];
-let sfValue = 0;
+// All live split-flap counters across all frames (one entry per frame built)
+let allSfCounters = [];
 
 const gameState = {
   date: "",
@@ -209,6 +208,7 @@ async function getTodaysSeed() {
 }
 
 async function initGame() {
+  allSfCounters = [];
   showLoading(true);
   try {
     // If the player already finished today's puzzle, restore the result screen
@@ -573,10 +573,10 @@ function buildActorCell(actor, side) {
     cell.appendChild(buildPhotoSVG());
   }
 
-  // Vignette — outer edge anchored per side
+  // Vignette — outer edge anchored per side; solo = centered (full-width single cell)
   const vig = document.createElement("div");
   vig.className = "cell-vig";
-  const cx = side === "left" ? "42% 42%" : "58% 42%";
+  const cx = side === "left" ? "42% 42%" : side === "right" ? "58% 42%" : "50% 42%";
   vig.style.background = `radial-gradient(125% 78% at ${cx}, transparent 48%, rgba(8,6,4,0.6) 80%, #080604 100%)`;
   cell.appendChild(vig);
 
@@ -658,10 +658,10 @@ function flipSFTile(tile, oldD, newD) {
 function buildSFCounter(initialScore) {
   const counter = document.createElement("div");
   counter.className = "sf-counter";
-  sfTiles = [makeSFTile(), makeSFTile()];
+  const tiles = [makeSFTile(), makeSFTile()];
   const s = String(Math.max(0, Math.min(99, initialScore))).padStart(2, "0");
-  sfTiles.forEach((t, i) => { setSFDigit(t, s[i]); counter.appendChild(t); });
-  sfValue = initialScore;
+  tiles.forEach((t, i) => { setSFDigit(t, s[i]); counter.appendChild(t); });
+  allSfCounters.push({ tiles, value: initialScore });
   return counter;
 }
 
@@ -674,21 +674,40 @@ function buildSFCounter(initialScore) {
 function buildActiveContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
-  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(left, "left"));
-  win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(right, "right"));
 
-  const plate = document.createElement("div");
-  plate.className = "logo-plate";
-  const logo = document.createElement("div");
-  logo.className = "logo-6deg";
-  logo.innerHTML = '6<span class="deg">°</span>';
-  plate.appendChild(logo);
-  plate.appendChild(buildSFCounter(gameState.score));
-  win.appendChild(plate);
+  const isExpansion = pair.direction && pair.direction !== "initial";
+  if (isExpansion) {
+    const newActor      = pair.direction === "left" ? pair.actorA : pair.actorB;
+    const connectsTo    = pair.direction === "left" ? pair.actorB.name : pair.actorA.name;
+    win.appendChild(buildActorCell(newActor, "solo"));
+    const plate = document.createElement("div");
+    plate.className = "logo-plate";
+    const logo = document.createElement("div");
+    logo.className = "logo-6deg";
+    logo.innerHTML = '6<span class="deg">°</span>';
+    plate.appendChild(logo);
+    plate.appendChild(buildSFCounter(gameState.score));
+    const hint = document.createElement("div");
+    hint.className = "connects-to-hint";
+    hint.textContent = `+ ${connectsTo}`;
+    plate.appendChild(hint);
+    win.appendChild(plate);
+  } else {
+    const [left, right] = getDisplayActors(pair);
+    win.appendChild(buildActorCell(left, "left"));
+    win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
+    win.appendChild(buildActorCell(right, "right"));
+    const plate = document.createElement("div");
+    plate.className = "logo-plate";
+    const logo = document.createElement("div");
+    logo.className = "logo-6deg";
+    logo.innerHTML = '6<span class="deg">°</span>';
+    plate.appendChild(logo);
+    plate.appendChild(buildSFCounter(gameState.score));
+    win.appendChild(plate);
+  }
 
   frame.appendChild(win);
   frame.appendChild(buildPerfRow());
@@ -873,14 +892,15 @@ function showError(msg) {
 }
 
 function updateScoreDisplay() {
-  if (!sfTiles.length) return;
   const next = Math.max(0, Math.min(99, gameState.score));
-  const o = String(sfValue).padStart(2, "0");
-  const n = String(next).padStart(2, "0");
-  for (let i = 0; i < 2; i++) {
-    if (o[i] !== n[i]) flipSFTile(sfTiles[i], o[i], n[i]);
+  const ns = String(next).padStart(2, "0");
+  for (const c of allSfCounters) {
+    const os = String(c.value).padStart(2, "0");
+    for (let i = 0; i < 2; i++) {
+      if (os[i] !== ns[i]) flipSFTile(c.tiles[i], os[i], ns[i]);
+    }
+    c.value = next;
   }
-  sfValue = next;
 }
 
 function showCopyConfirm() {

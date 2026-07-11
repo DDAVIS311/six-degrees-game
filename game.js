@@ -156,9 +156,11 @@ function normalizeTitle(t) {
   return t.toLowerCase()
     .replace(/^(the|a|an)\s+/i, "")
     .replace(/[^a-z0-9\s]/g, "")
+    // Strip common sequel/edition words so "Chapter 3" == "3", "Part II" == "II"
+    .replace(/\b(chapter|part|vol|volume|episode)\b/g, "")
     .replace(/\s+/g, " ")
     .trim()
-    // Unify Roman numerals and Arabic digits so "III" == "3", "MI3" == "MI III"
+    // Unify Roman numerals and Arabic digits so "III" == "3"
     .replace(/\b(viii|vii|xii|xi|vi|ix|iv|iii|ii|x|v|i)\b/g, m => ROMAN_MAP[m]);
 }
 
@@ -713,16 +715,23 @@ function buildActiveContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 }
 
-// Solved: actor cells + plate showing the connecting film title
+// Solved: for initial pair show both actors + film; for expansion show only the new actor + film
 function buildSolvedContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
-  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(left, "left"));
-  win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(right, "right"));
+  const isExpansion = pair.direction && pair.direction !== "initial";
+
+  if (isExpansion) {
+    const newActor = pair.direction === "left" ? pair.actorA : pair.actorB;
+    win.appendChild(buildActorCell(newActor, "solo"));
+  } else {
+    const [left, right] = getDisplayActors(pair);
+    win.appendChild(buildActorCell(left, "left"));
+    win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
+    win.appendChild(buildActorCell(right, "right"));
+  }
 
   const plate = document.createElement("div");
   plate.className = "plate-info";
@@ -736,16 +745,23 @@ function buildSolvedContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 }
 
-// Failed: actor cells + plate showing the answer hint
+// Failed: for initial pair show both actors + hint; for expansion show only the new actor + hint
 function buildFailedContent(frame, pair) {
   frame.appendChild(buildPerfRow());
 
-  const [left, right] = getDisplayActors(pair);
   const win = document.createElement("div");
   win.className = "film-window";
-  win.appendChild(buildActorCell(left, "left"));
-  win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
-  win.appendChild(buildActorCell(right, "right"));
+  const isExpansion = pair.direction && pair.direction !== "initial";
+
+  if (isExpansion) {
+    const newActor = pair.direction === "left" ? pair.actorA : pair.actorB;
+    win.appendChild(buildActorCell(newActor, "solo"));
+  } else {
+    const [left, right] = getDisplayActors(pair);
+    win.appendChild(buildActorCell(left, "left"));
+    win.appendChild(Object.assign(document.createElement("div"), { className: "cell-divider" }));
+    win.appendChild(buildActorCell(right, "right"));
+  }
 
   const plate = document.createElement("div");
   plate.className = "plate-info";
